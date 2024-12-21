@@ -45,8 +45,8 @@ while( <> ) {
     for ( @C ) {
       $R = &B( $R , $_ , ++$L );
     }
-    next ; ## 
-    while(0 && $R ){
+    last if @C == 1 ;
+    while( $R ){
       $$R->{''}[3]{$L}++ ;
       $R = $$R->{''}[1] ;
     }
@@ -56,7 +56,7 @@ while( <> ) {
 
 A:
 use Data::Dumper ; 
-print Dumper ( [$T] ) ; 
+print Dumper ( $T ) ; 
 
 exit 0 ; 
 
