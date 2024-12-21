@@ -1,0 +1,108 @@
+#!/usr/bin/perl 
+#use 5.034 ; use warnings ; # 最新版で動くようにしたい。
+use 5.014 ; use warnings ; # 古いものでも動くようにする。 v5.14 は 2011年5月14日 にリリースされている。
+use Time::HiRes qw [ gettimeofday tv_interval ] ;
+my ${ dt_start } = [ gettimeofday ] ; 
+use Encode qw[ decode_utf8 encode_utf8 ] ; 
+use Getopt::Std ; getopts '' , \my %o  ; 
+use Term::ANSIColor qw[ color :constants ] ; $Term::ANSIColor::AUTORESET = 1 ;
+use FindBin qw[ $Script ] ; 
+use List::Util qw[ min max ] ; 
+use utf8 ; 
+
+# * d3 = exists $o{','} && $o{','} eq 0 ? sub{$_[0]} : sub { $_[0] =~ s/(?<=\d)(?=(\d\d\d)+($|\D))/,/gr } ;
+#my $time0 = time ; 
+my $help = 0  ; # オンラインヘルプの文面の表示をしたか否か。
+my $readLines  ; # 読み取った行数
+my $sec = $o{'@'} // 15 ; # 何秒おきにアラームを発生させるか
+
+our @y_ranges ; 
+& y_init () ; 
+
+$SIG{INT} = sub { exit } ;
+binmode STDIN , "utf8" ; 
+binmode STDOUT , "utf8" ;
+
+my %T ; # $T{最初の文字}{2番目の文字}..{''} のようなツリー構造にする。
+        #$x->{文字1} ->{""} = [ 出現頻度F,親の参照ref,文字列長さL, #ある構造体#] のようなデータを作る。
+        # ある構造体とは、$x->{文字列長さ} = そういう文字列の出現頻度 であり、 右辺がゼロなら delete される。
+while( <> ) { 
+  chomp ;
+  my @C = split // , $_ , 0 ; # 各文字 にバラバラにする。
+  while ( @C ) { 
+    my $L = 0 ; # 格納した文字が左から何番目であるか length
+    my $R = \$T{ shift @C }; # refrence ;
+    for ( @C ) {
+      $$R->{''}[0] ++ ; 
+      $$R->{''}[1] = $R ;
+      $$R->{''}[2] = ++ $L ;
+      $R = \ $$R -> {$_} ;
+    }
+  }
+}
+
+sub B ($) { 
+  $$_[0]->{''}[0] ++ ; 
+  $$_[0]->{''}[1] = $_[0] ;
+  $$_[0]->{''}[2] = ++ $L ;
+  retrun \ $$R -> {$_} ;
+}
+
+use Data::Dumper ; 
+print Dumper ( [%T] ) ; 
+
+exit 0 ; 
+
+##
+sub y_init ( ) { 
+  my @ranges = split /,/o , $o{y} // '' , -1 ; 
+  grep { $_ = $_ . ".." . $_ unless m/\.\./ }  @ranges ; # = split /,/ , $o{y} // '' , -1 ; 
+  do { m/^(\d*)\.\.(\d*)/ ; push @y_ranges , [ $1||1 , $2||'Inf' ] } for @ranges ; 
+}
+sub y_filter ( $ ) { 
+  do { return not 0 if $_->[0] <= $_[0] && $_[0] <= $_->[1] } for @y_ranges ; 
+  return @y_ranges ? not 1 : not 0 ; # 指定が無かった場合はとにかく真を返す。
+}
+
+END {
+  exit if $help ;
+  my $procsec = sprintf "%.5f", tv_interval ${ dt_start } ; # このプログラムの処理にかかった秒数。比較する2個の時刻は秒単位なので、±1秒未満の誤差は発生する。
+  return if ($o{2}//'') eq 0 ; 
+  my $s = tv_interval $dt_start , [ gettimeofday ] ; 
+  say STDERR BOLD FAINT ITALIC " -- $Script ; " . $procsec . " sec. in process" ;
+}
+
+## ヘルプの扱い
+sub VERSION_MESSAGE {}
+sub HELP_MESSAGE {
+  use FindBin qw[ $Script ] ; 
+  $ARGV[1] //= '' ;
+  open my $FH , '<' , $0 ;
+  while(<$FH>){
+    s/\$0/$Script/g ;
+    print $_ if s/^=head1// .. s/^=cut// and $ARGV[1] =~ /^o(p(t(i(o(ns?)?)?)?)?)?$/i ? m/^\s+\-/ : 1;
+  }
+  close $FH ;
+  exit 0 ;
+}
+
+=encoding utf8
+
+=head1 $0 
+
+  同じ文字列が複数回出現していないかをしらべる。 
+  長いものを優先し、その次に出現回数の多いものを検出する。
+
+使用例 : 
+    $0 
+
+オプション : 
+
+  --help : このオンラインのヘルプ画面を出力する。 perldoc $0 や man $0 でも可能であろう。
+
+開発メモ : 
+  * 検出する文字数で長いものは制限するオプションを実装したい。
+  * 長いものから検出するにしても、短いものはどこまで検出をすれば良いだろうか? 短いものは、一文字で複数検出されたものを数個出したら終わりで良いか? 
+  * 計算時間が長くならないか，気になる。 
+
+=cut
