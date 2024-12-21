@@ -64,12 +64,11 @@ use Data::Dumper ;
 #print Dumper ( $T->{''}[1] ) ; 
 #print Dumper $T;
 #exit;  
-for my $L ( sort { $b <=> $a } keys %{ $T ->{''}[1] } ) { # 最も長い順から取り出す
-  my @N = keys %{ $T->{''}[1]{$L} } ;  # 次の文字(1文字目)
+my $R = \$T ; 
+for my $L ( sort { $b <=> $a } keys %{ $$R ->{''}[1] } ) { # 最も長い順から取り出す
+  my @N = grep { $$R ->{''}[1]{$L}{$_} >= 2 } keys %{ $$R ->{''}[1]{$L} } ;  # 次の文字(1文字目)
   for ( @N ) {
-    my $frq = $T->{''}[1]{$L}{$_} ; 
-    next if $frq <= 1 ;
-    #say "$L '$_' $frq" ; 
+    say "$L '$_' $frq" ; 
     #$T->{''}[1]{$L}{$_}
     #say YELLOW Dumper $T->{$_}{''}[4];
     #$o{g} -- || last ;  
