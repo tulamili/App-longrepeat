@@ -1,6 +1,6 @@
 #!/usr/bin/perl 
-#use 5.034 ; use warnings ; # 最新版で動くようにしたい。
-use 5.014 ; use warnings ; # 古いものでも動くようにする。 v5.14 は 2011年5月14日 にリリースされている。
+use 5.034 ; use warnings ; # 最新版で動くようにしたい。
+#use 5.014 ; use warnings ; # 古いものでも動くようにする。 v5.14 は 2011年5月14日 にリリースされている。
 use Time::HiRes qw [ gettimeofday tv_interval ] ;
 my ${ dt_start } = [ gettimeofday ] ; 
 use Encode qw[ decode_utf8 encode_utf8 ] ; 
@@ -11,8 +11,6 @@ use List::Util qw[ min max ] ;
 use utf8 ; 
 
 $o{g}//=10 ;
-# * d3 = exists $o{','} && $o{','} eq 0 ? sub{$_[0]} : sub { $_[0] =~ s/(?<=\d)(?=(\d\d\d)+($|\D))/,/gr } ;
-#my $time0 = time ; 
 my $help = 0  ; # オンラインヘルプの文面の表示をしたか否か。
 my $readLines  ; # 読み取った行数
 my $sec = $o{'@'} // 15 ; # 何秒おきにアラームを発生させるか
@@ -43,8 +41,7 @@ while( <> ) {
   while ( $_ = shift @C ) { 
     # 文字列を左から右に処理。
     my $L = 0 ; # 格納した文字が左から何番目であるか。逆方向に辿るときには、(最終的に?)文字列の長さ Length
-    my $R = \$T; # refrence ;
-    $R = &B($R, $_ , ++$L) ;
+    my $R = &B( \$T , $_ , ++$L) ; # refrence ;
     for ( @C ) {
       $R = &B( $R , $_ , ++$L );
     } 
@@ -58,46 +55,38 @@ while( <> ) {
   }
 }
 
+my $d = 0 ;
+no warnings 'recursion';
 & P ( \$T , '' ) ;
 
 sub P( $ $ ) { # 引数 : $R[0] (0) , 組み立て中の文字列 (1)  
+  $d ++ ; 
   my $R = $_[0] ; 
   # 最奥判定
-  use Data::Dumper ; 
+  #use Data::Dumper ; 
   #say Dumper keys %{$$R} ; exit ;
   my @k ; 
-  eval { @k =  grep { $$R->{$_}[2] >= 2 } grep {$_ ne '' } keys %{$$R} } ; # 終末でもなく 2回以上出現した 文字を  暫定的に取り出す 
+  #do { say RED $d ; say YELLOW ref $R } if $d == 2 ; 
+  @k = keys %{$$R} ; # ref $$R eq 'HASH' ? keys %{$$R} : () ; 
+  @k = grep { $_ ne '' } @k ;
+  @k = grep { $$R->{$_}{''}[2]  >= 2 } @k ; 
+  #my @k =  grep { $$R->{$_}[2] >= 2 } grep {$_ ne '' } ref $$R eq 'HASH' ? keys %{$$R} : () ;#keys %{$$R}  ; # 終末でもなく 2回以上出現した 文字を  暫定的に取り出す 
   #my @k = eval{ keys %{$$R} } ; # 終末でもなく 2回以上出現した 文字を  暫定的に取り出す 
-  say RED scalar @k ; 
+  #say RED join ",", @k ; 
   if ( @k == 0 ) {
-    say CYAN sprintf "%s %s %s" , $$R->{''}[3] , $$R->{''}[2] , $_[1] . $$R->{''}[4] ; # 文字列長と頻度と文字列を 表示
+    say CYAN sprintf "%s\t%s\t'%s'" , $$R->{''}[3] , $$R->{''}[2] , $_[1] . $$R->{''}[4] ; # 文字列長と頻度と文字列を 表示
     return ; 
   } 
   # 上記判定にかからない中間的な状態の場合
   for my $L ( sort { $b <=> $a } keys %{ $$R ->{''}[1] } ) { # (暫定的に)最も長い順から取り出す
     my @N = grep { $$R ->{''}[1]{$L}{$_} >= 2 } keys %{ $$R ->{''}[1]{$L} } ;  # 頻度が2回以上
     for ( @N ) { 
-      #$$R -> {$_}{''}[4]
-      & P ( $$R->{$_} , "$_[1]$_" ) ; # 再帰的な呼び出し
+      & P ( \ $$R->{$_} , "$_[1]$_" ) ; # 再帰的な呼び出し
     }
   }
 }
 
 exit 0 ;
-
-#for my $L ( sort { $b <=> $a } keys %{ $$R ->{''}[1] } ) { # (暫定的に)最も長い順から取り出す
-#  my @N = grep { $$R ->{''}[1]{$L}{$_} >= 2 } keys %{ $$R ->{''}[1]{$L} } ;  # 次の文字(1文字目)
-#  for ( @N ) {
-#    say "$L '$_' $T->{$_}{''}[4]" ; 
-    #$T->{''}[1]{$L}{$_}
-    #say YELLOW Dumper $T->{$_}{''}[4];
-    #$o{g} -- || last ;  
-#  }
-  #next if @N <= 1 ;
-  #say "$_:" ;
-  #say join "+\n" , map { "'$_'"} @N ; 
-  #say "" ;
-#}
 
 ##
 sub y_init ( ) { 
