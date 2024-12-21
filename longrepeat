@@ -4,13 +4,15 @@ use 5.034 ; use warnings ; # 最新版で動くようにしたい。
 use Time::HiRes qw [ gettimeofday tv_interval ] ;
 my ${ dt_start } = [ gettimeofday ] ; 
 use Encode qw[ decode_utf8 encode_utf8 ] ; 
-use Getopt::Std ; getopts 'g:' , \my %o  ; 
+use Getopt::Std ; getopts 'g:l:m:' , \my %o  ; 
 use Term::ANSIColor qw[ color :constants ] ; $Term::ANSIColor::AUTORESET = 1 ;
 use FindBin qw[ $Script ] ; 
 use List::Util qw[ min max ] ; 
 use utf8 ; 
 
 $o{g}//=10 ;
+$o{m}//=2 ; # 何重以上を出力するか
+$o{l}//=2 ; # 何文字以上　の反復を出力するか 
 my $help = 0  ; # オンラインヘルプの文面の表示をしたか否か。
 my $readLines  ; # 読み取った行数
 my $sec = $o{'@'} // 15 ; # 何秒おきにアラームを発生させるか
@@ -44,6 +46,7 @@ while( <> ) {
     my $R = &B( \$T , $_ , ++$L) ; # refrence ;
     for ( @C ) {
       $R = &B( $R , $_ , ++$L );
+      #last ; 
     } 
     # 逆方向に辿るような処理
     my $N = '' ; # 次の文字 undef は不都合有り 仕方なしに 空文字  を上記とは違う意味でつかう。 
@@ -55,31 +58,26 @@ while( <> ) {
   }
 }
 
-my $d = 0 ;
-no warnings 'recursion';
+#my $d = 0 ; # 深さを測るつもりだった。
+say UNDERLINE join "\t", qw[len frq content] ;
+no warnings 'recursion'; # <-- -- 100回の制限を突破 !?
 & P ( \$T , '' ) ;
 
 sub P( $ $ ) { # 引数 : $R[0] (0) , 組み立て中の文字列 (1)  
-  $d ++ ; 
+  #$d ++ ; 
   my $R = $_[0] ; 
   # 最奥判定
-  #use Data::Dumper ; 
-  #say Dumper keys %{$$R} ; exit ;
-  my @k ; 
-  #do { say RED $d ; say YELLOW ref $R } if $d == 2 ; 
-  @k = keys %{$$R} ; # ref $$R eq 'HASH' ? keys %{$$R} : () ; 
-  @k = grep { $_ ne '' } @k ;
-  @k = grep { $$R->{$_}{''}[2]  >= 2 } @k ; 
-  #my @k =  grep { $$R->{$_}[2] >= 2 } grep {$_ ne '' } ref $$R eq 'HASH' ? keys %{$$R} : () ;#keys %{$$R}  ; # 終末でもなく 2回以上出現した 文字を  暫定的に取り出す 
-  #my @k = eval{ keys %{$$R} } ; # 終末でもなく 2回以上出現した 文字を  暫定的に取り出す 
-  #say RED join ",", @k ; 
+  return if ref $$R ne 'HASH' ; 
+  my @k = grep { $_ ne '' && $$R->{$_}{''}[2] >= 2 } keys %{$$R} ;#keys %{$$R}  ; # 終末でもなく 2回以上出現した 文字を  暫定的に取り出す  
   if ( @k == 0 ) {
-    say CYAN sprintf "%s\t%s\t'%s'" , $$R->{''}[3] , $$R->{''}[2] , $_[1] . $$R->{''}[4] ; # 文字列長と頻度と文字列を 表示
+    return if ($$R->{''}[3] //0)  < $o{l} ; 
+    #say sprintf "%s\t%s\t'%s'" , $$R->{''}[3]+1, $$R->{''}[2] , $_[1] . $$R->{''}[4] ; # 文字列長と頻度と文字列を 表示 <-- -- - なぜ +1の必要があるのか??
+    say sprintf "%s\t%s\t'%s'" , $$R->{''}[3] , $$R->{''}[2] , $_[1] ;
     return ; 
   } 
   # 上記判定にかからない中間的な状態の場合
   for my $L ( sort { $b <=> $a } keys %{ $$R ->{''}[1] } ) { # (暫定的に)最も長い順から取り出す
-    my @N = grep { $$R ->{''}[1]{$L}{$_} >= 2 } keys %{ $$R ->{''}[1]{$L} } ;  # 頻度が2回以上
+    my @N = grep { $$R ->{''}[1]{$L}{$_} >= $o{m} } keys %{ $$R ->{''}[1]{$L} } ;  # 頻度が2回以上
     for ( @N ) { 
       & P ( \ $$R->{$_} , "$_[1]$_" ) ; # 再帰的な呼び出し
     }
@@ -133,6 +131,8 @@ sub HELP_MESSAGE {
 
 オプション : 
 
+  -m  N : 何回以上の出現回数の場合に出力するか 
+  -l  N : 何文字以上の場合に出力するか  
   --help : このオンラインのヘルプ画面を出力する。 perldoc $0 や man $0 でも可能であろう。
 
 開発メモ : 
