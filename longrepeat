@@ -57,23 +57,36 @@ while( <> ) { # { 各行について }
       $R = $$R->{''}[0] ; 
     }
   }
+} continue {
+  $readLines ++ ; 
 }
 
 say UNDERLINE join "\t", qw[ len frq content ] ;
 #goto AA ; 
 use Data::Dumper ; 
-for ( reverse $o{l} .. $#Th ) {
+for my $L ( reverse $o{l} .. $#Th ) {
   #next ; 
-  my @Rs = sort { $$b->{''}[2] <=> $$a->{''}[2] } grep { $$_->{''}[2] >= $o{m} } @{ $Th[$_] } ; 
+  my @Rs = sort { $$b->{''}[2] <=> $$a->{''}[2] } grep { $$_->{''}[2] >= $o{m} } @{ $Th[$L] } ; 
   for my $R ( @Rs ) {
     my $f ; # Frequency 頻度 
     my $s = '' ; # string 文字列 
     $f = $$R->{''}[2] ;  
     while ( $R ) {
+      #$$R->{''}[2] = 0  if $f == ($$R->{''}[2] //0) ; # 重複除去処理の1
       $s = ( $$R->{''}[4] // '' ) . $s ;
       $R = $$R->{''}[0] ; 
     }
-    say join "\t" , $_ , $f , $s ;
+    say join "\t" , ($L//'.') , $f , "'$s'" ;
+#
+    my @C = split // , $s , 0 ; # 各文字 にバラバラにする。
+    while ( $_ = shift @C ) { # { 各行の 文字列を左から一文字ずつ削り出して 処理 }
+      my $R = \$T0 ; 
+      for ( $_ , @C ) { 
+        my $Rc = \ $$R -> { $_ } ; 
+        $$Rc->{''}[2] = 0 if $$Rc->{''}[2] == $f ; 
+        $R = $Rc ; 
+      }
+    }
   }
 }
 
@@ -95,7 +108,7 @@ END {
   my $procsec = sprintf "%.5f", tv_interval ${ dt_start } ; # このプログラムの処理にかかった秒数。比較する2個の時刻は秒単位なので、±1秒未満の誤差は発生する。
   return if ($o{2}//'') eq 0 ; 
   my $s = tv_interval $dt_start , [ gettimeofday ] ; 
-  say STDERR BOLD FAINT ITALIC " -- $Script ; " . $procsec . " sec. in process" ;
+  say STDERR BOLD FAINT ITALIC " -- $Script ; " . $procsec . " sec. in process ; " . $readLines . " lines read." ;
 }
 
 ## ヘルプの扱い
