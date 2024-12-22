@@ -27,6 +27,7 @@ binmode STDOUT , "utf8" ;
 my $T0 ; # $T0{最初の文字}{2番目の文字}..{''} のようなツリー構造にする。
         #$x->{文字1} ->{""} = [親の参照ref (0),#ある構造体# (1) ,出現頻度(2), 文字列長 L(3), その注目文字(4)] のような、長さ4の無名配列のデータを作る。
         # ある構造体とは、$x->{文字列長さ} = そういう文字列の出現頻度 である。 後の 実装で次の様にしたい: 右辺がゼロなら delete される。
+#$T0->{''}[4]='FIRST' ;
 my @Th ; #  @{ $Th[ 考える文字列の長さ ] } は、 \ $T0{.}{.}..{.}　をリストで格納する。 そのリファレンスから、頻度を参照する
 
 sub B ($$$) { # 3個の変数は、  ( 親へのリファレンス, 注目文字, 処理中文字列の左から何文字目であるか ) 
@@ -61,23 +62,22 @@ say UNDERLINE join "\t", qw[ len frq content ] ;
 #goto AA ; 
 use Data::Dumper ; 
 for ( reverse $o{l} .. $#Th ) {
-  say Dumper $Th[$_] ;
-  next ; 
-  my @Rs = sort { $$b->[2] <=> $$a->[2] } grep { $$_->[2] >= $o{m} } @{ $Th[$_] } ; 
-  my $f ; # Frequency 頻度 
-  my $s = '' ; # string 文字列 
+  #next ; 
+  my @Rs = sort { $$b->{''}[2] <=> $$a->{''}[2] } grep { $$_->{''}[2] >= $o{m} } @{ $Th[$_] } ; 
   for my $R ( @Rs ) {
+    my $f ; # Frequency 頻度 
+    my $s = '' ; # string 文字列 
     $f = $$R->{''}[2] ;  
-    while ( $R ) { 
-      $s = $$R->{''}[4] . $s ;
+    while ( $R ) {
+      $s = ( $$R->{''}[4] // '' ) . $s ;
       $R = $$R->{''}[0] ; 
     }
     say join "\t" , $_ , $f , $s ;
   }
 }
 
-exit ; 
-AA: 
+exit ;
+#AA: 
 no warnings 'recursion'; # <-- -- 100回の制限を突破 !?
 & P ( \$T0 , '' ) ;
 
