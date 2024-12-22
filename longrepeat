@@ -4,7 +4,7 @@ use 5.034 ; use warnings ; # 最新版で動くようにしたい。
 use Time::HiRes qw [ gettimeofday tv_interval ] ;
 my ${ dt_start } = [ gettimeofday ] ; 
 use Encode qw[ decode_utf8 encode_utf8 ] ; 
-use Getopt::Std ; getopts 'g:l:m:' , \my %o  ; 
+use Getopt::Std ; getopts '@:g:l:m:' , \my %o  ; 
 use Term::ANSIColor qw[ color :constants ] ; $Term::ANSIColor::AUTORESET = 1 ;
 use FindBin qw[ $Script ] ; 
 use List::Util qw[ min max ] ; 
@@ -15,10 +15,11 @@ $o{m}//=2 ; # 何重以上を出力するか
 $o{l}//=2 ; # 何文字以上　の反復を出力するか 
 my $help = 0  ; # オンラインヘルプの文面の表示をしたか否か。
 my $readLines  ; # 読み取った行数
-my $sec = $o{'@'} // 15 ; # 何秒おきにアラームを発生させるか
+$o{'@'} //= 15 ; # 何秒おきにアラームを発生させるか
 
 our @y_ranges ; 
 & y_init () ; 
+my $d3 = sub($) { $_[0] =~ s/(?<=\d)(?=(\d\d\d)+($|\D))/,/gr } ;# 3桁区切り　千進法表記
 
 $SIG{INT} = sub { exit } ;
 binmode STDIN , "utf8" ; 
@@ -27,6 +28,10 @@ binmode STDOUT , "utf8" ;
 my $T0 ; # $T0{最初の文字}{2番目の文字}..{''} のようなツリー構造にする。 #$x->{文字1} ->{""} = [親の参照ref (0),その注目文字(1) ,出現頻度(2) ] のような、長さ4の無名配列のデータを作る。
 my @Th ; #  @{ $Th[ 考える文字列の長さ ] } は、 \ $T0{.}{.}..{.}　をリストで格納する。 そのリファレンスから、頻度を参照する
 my %Th_seen ; 
+
+$SIG{ALRM} = sub { say STDERR FAINT BOLD $d3->($.) .  " lines read." ; alarm $o{'@'} ; } ; 
+
+alarm $o{'@'} ; 
 
 sub B ($$$) { # 3個の変数は、  ( 親へのリファレンス, 注目文字, 処理中文字列の左から何文字目であるか ) 
   my ($R,$C,$L) = @_ ; 
