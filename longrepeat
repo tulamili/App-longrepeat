@@ -4,19 +4,20 @@ use 5.014 ; use warnings ; # 古いものでも動くようにする。 v5.14 �
 use Time::HiRes qw [ gettimeofday tv_interval ] ;
 my ${ dt_start } = [ gettimeofday ] ; 
 use Encode qw[ decode_utf8 encode_utf8 ] ; 
-use Getopt::Std ; getopts '@:g:l:m:' , \my %o  ; 
+use Getopt::Std ; getopts '@:g:l:m:y:' , \my %o  ; 
 use Term::ANSIColor qw[ color :constants ] ; $Term::ANSIColor::AUTORESET = 1 ;
 use FindBin qw[ $Script ] ; 
 
 
-$o{g}//=12 ; # 最大何個表示させるか
+$o{g}//=20 ; # 最大何個表示させるか
 $o{m}//=2 ; # 何重以上を出力するか
 $o{l}//=2 ; # 何文字以上　の反復を出力するか 
 my $help = 0  ; # オンラインヘルプの文面の表示をしたか否か。
 my $readLines  ; # 読み取った行数
 $o{'@'} //= 15 ; # 何秒おきにアラームを発生させるか
 
-
+our @y_ranges ; 
+& y_init () ;
 my $d3 = sub($) { $_[0] =~ s/(?<=\d)(?=(\d\d\d)+($|\D))/,/gr } ;# 3桁区切り　千進法表記
 
 $SIG{INT} = sub { exit } ;
@@ -65,8 +66,8 @@ for my $L ( reverse $o{l} .. $#Th ) {
       $s = ( $$R->{''}[1] // '' ) . $s ;
       $R = $$R->{''}[0] ; 
     }
-    say join "\t" , ($L//'.') , $f , "'$s'" ;
-    goto END unless -- $o{g} ; 
+    say join "\t" , ($L//'.') , $f , "'$s'" if &y_filter ( $f ) && $o{g} -- ;
+    goto END unless $o{g} ; 
     #  # 重複除去処理
     my @C = split // , $s , 0 ; # 各文字 にバラバラにする。
     while ( $_ = shift @C ) { # { 各行の 文字列を左から一文字ずつ削り出して 処理 }
@@ -92,6 +93,20 @@ END {
   say STDERR BOLD FAINT ITALIC " -- $Script ; " . $procsec . " sec. in process ; " . $readLines . " lines read." ;
 }
 
+
+##
+sub y_init ( ) { 
+  my @ranges = split /,/o , $o{y} // '' , -1 ; 
+  grep { $_ = $_ . ".." . $_ unless m/\.\./ }  @ranges ; # = split /,/ , $o{y} // '' , -1 ; 
+  do { m/^(\d*)\.\.(\d*)/ ; push @y_ranges , [ $1||1 , $2||'Inf' ] } for @ranges ; 
+}
+sub y_filter ( $ ) { 
+  do { return not 0 if $_->[0] <= $_[0] && $_[0] <= $_->[1] } for @y_ranges ; 
+  return @y_ranges ? not 1 : not 0 ; # 指定が無かった場合はとにかく真を返す。
+}
+
+
+
 ## ヘルプの扱い
 sub VERSION_MESSAGE {}
 sub HELP_MESSAGE {
@@ -113,14 +128,24 @@ sub HELP_MESSAGE {
   同じ文字列が複数回出現していないかを調べる。 
   長いものを優先し、その次に出現回数の多いものを検出する。
 
-使用例 : 
-    $0 
+使用例 :
+  longrepeat /etc/passwd  # 指定されたファイルの中身から、何度も出現する文字列が出力される。
+
+  cat dohyo.txt | perl -pe 's/。/。\n/g'  | perl -pe 's/、/、\n/g' | time longrepeat
+    # 青空文庫で最も長い「道標」(約84万文字)をそのまま処理できないので、句読点ごとにわざと改行文字をいれて処理。 
+
+  たとえば教員であれば、多数の学生から集めたレポートに対して、全く同じ言い回しで長いものを検出するのに使える。 
+   (下記の -y のオプションを使うことで、大人数の学生が共通して使う言い回しは、頻度多すぎなので、出力しないという条件設定も可能。)
+  
+  Wikipedia の各国言語のさまざまなページの内容で試すのも、興味深い結果を見ることが出来るであろう。
+   その場合は、ピリオドなどの句読点の直後に、改行文字を加えるなどの処理が望ましい。
 
 オプション : 
 
-  -m  N : 何回以上の出現回数の場合に出力するか。(未指定なら2)
+  -g  N : 何個まで取り出すか。(未指定なら20)
+  -m  N : 何回以上の頻度(出現回数)の場合に出力するか。(未指定なら2)
   -l  N : 何文字以上の場合に出力するか。(未指定なら2)  
-  -g  N : 何個まで取り出すか。(未指定なら12)
+  -y  range : 出力する頻度の条件を、2個のピリオド(..)とコンマ(,)で指示する。(3..10,20..30などと表記。) 
   -@  N : 標準入力から読み取った行数を N 秒ごとに 標準エラー出力に 出力する。(未指定なら15)
   --help : このオンラインのヘルプ画面を出力する。 perldoc $0 や man $0 でも可能であろう。
 
