@@ -1,24 +1,22 @@
 #!/usr/bin/perl 
-use 5.034 ; use warnings ; # 最新版で動くようにしたい。
-#use 5.014 ; use warnings ; # 古いものでも動くようにする。 v5.14 は 2011年5月14日 にリリースされている。
+#use 5.034 ; use warnings ; # 最新版に近いPerlで動くようにするのが望ましい。
+use 5.014 ; use warnings ; # 古いものでも動くようにする。 v5.14 は 2011年5月14日 にリリースされている。
 use Time::HiRes qw [ gettimeofday tv_interval ] ;
 my ${ dt_start } = [ gettimeofday ] ; 
 use Encode qw[ decode_utf8 encode_utf8 ] ; 
 use Getopt::Std ; getopts '@:g:l:m:' , \my %o  ; 
 use Term::ANSIColor qw[ color :constants ] ; $Term::ANSIColor::AUTORESET = 1 ;
 use FindBin qw[ $Script ] ; 
-use List::Util qw[ min max ] ; 
-use utf8 ; 
 
-$o{g}//=10 ; # 何個表示させるか
+
+$o{g}//=12 ; # 最大何個表示させるか
 $o{m}//=2 ; # 何重以上を出力するか
 $o{l}//=2 ; # 何文字以上　の反復を出力するか 
 my $help = 0  ; # オンラインヘルプの文面の表示をしたか否か。
 my $readLines  ; # 読み取った行数
 $o{'@'} //= 15 ; # 何秒おきにアラームを発生させるか
 
-our @y_ranges ; 
-& y_init () ; 
+
 my $d3 = sub($) { $_[0] =~ s/(?<=\d)(?=(\d\d\d)+($|\D))/,/gr } ;# 3桁区切り　千進法表記
 
 $SIG{INT} = sub { exit } ;
@@ -85,16 +83,6 @@ for my $L ( reverse $o{l} .. $#Th ) {
 END: 
 exit 0 ;
 
-##
-sub y_init ( ) { 
-  my @ranges = split /,/o , $o{y} // '' , -1 ; 
-  grep { $_ = $_ . ".." . $_ unless m/\.\./ }  @ranges ; # = split /,/ , $o{y} // '' , -1 ; 
-  do { m/^(\d*)\.\.(\d*)/ ; push @y_ranges , [ $1||1 , $2||'Inf' ] } for @ranges ; 
-}
-sub y_filter ( $ ) { 
-  do { return not 0 if $_->[0] <= $_[0] && $_[0] <= $_->[1] } for @y_ranges ; 
-  return @y_ranges ? not 1 : not 0 ; # 指定が無かった場合はとにかく真を返す。
-}
 
 END {
   exit if $help ;
