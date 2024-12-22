@@ -30,28 +30,28 @@ my %Th_seen ;
 
 sub B ($$$) { # 3個の変数は、  ( 親へのリファレンス, 注目文字, 処理中文字列の左から何文字目であるか ) 
   my ($R,$C,$L) = @_ ; 
-  my $Rc = \ $$R -> { $C } ; # 子へのリファレンスを 生成している  $$_[0] -> { $_[1]} はエラーが出た謎あり。${$_[0]} -> { $_[1]} で対処出来た。
+  my $Rc = \ $$R -> { "$C" } ; # 子へのリファレンスを 生成している  $$_[0] -> { $_[1]} はエラーが出た謎あり。${$_[0]} -> { $_[1]} で対処出来た。
   $$Rc->{''}[0] = $R ; # 親へのリファレンス  
-  $$Rc->{''}[2] ++ ; 
   $$Rc->{''}[1] = $C ; # 注目文字 
-  push @{ $Th [ $L ] } , $Rc unless $Th_seen { $Rc } ++ ; 
+  $$Rc->{''}[2] ++ ;   # 頻度
+  push @{ $Th [ $L ] } , $Rc unless $Th_seen { $Rc } ++ ;
+  #say CYAN $L ;  
   return ( $Rc ) ; # 生成した子(与えられた文字に対応している)のリファレンスを返す。
 }
 
-while( <> ) { # { 各行について }
+while ( <> ) { # { 各行について }
   chomp ;
   my @C = split // , $_ , 0 ; # 各文字 にバラバラにする。
-  while ( $_ = shift @C ) { # { 各行の 文字列を左から一文字ずつ削り出して 処理 }
+  while ( defined ( $_ = shift @C ) )  { # { 各行の 文字列を左から一文字ずつ削り出して 処理 }
     my $L = 0 ; # 格納した文字が左から何番目であるか。 (逆方向に辿るときには、(最終的に?)文字列の長さ にするので 前置++とした) Length 
     my $R = \$T0 ; # & B ( \$T0 , $_ , ++ $L ) ; # refrence ;
-    $R = & B ( $R , $_ , ++ $L ) for $_ , @C ; # <- 糖衣構文  for 文
+    for ($_ , @C) { $R = & B ( $R , $_ , ++ $L ) } ; # <- 糖衣構文  for 文
   }
 } continue {
   $readLines ++ ; 
 }
 
-say UNDERLINE join "\t", qw[ len frq content ] ;
-use Data::Dumper ; 
+say UNDERLINE join "\t", qw[ len frq content ] ; 
 for my $L ( reverse $o{l} .. $#Th ) {
   my @Rs = sort { $$b->{''}[2] <=> $$a->{''}[2] } grep { $$_->{''}[2] >= $o{m} } @{ $Th[$L] } ; 
   for my $R ( @Rs ) {
