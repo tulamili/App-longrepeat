@@ -59,9 +59,12 @@ while( <> ) { # { 各行について }
 
 say UNDERLINE join "\t", qw[ len frq content ] ;
 #goto AA ; 
+use Data::Dumper ; 
 for ( reverse $o{l} .. $#Th ) {
+  say Dumper $Th[$_] ;
+  next ; 
   my @Rs = sort { $$b->[2] <=> $$a->[2] } grep { $$_->[2] >= $o{m} } @{ $Th[$_] } ; 
-  my $f ; # Frequenc 頻度 
+  my $f ; # Frequency 頻度 
   my $s = '' ; # string 文字列 
   for my $R ( @Rs ) {
     $f = $$R->{''}[2] ;  
