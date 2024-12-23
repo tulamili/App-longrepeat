@@ -1,6 +1,6 @@
 package App::longrepeat ;  
-our $VERSION = '0.002' ; 
-our $DATE = '2024-12-22T19:10+09:00' ; 
+our $VERSION = '0.003' ; 
+our $DATE = '2024-12-23T14:40+09:00' ; 
 
 =encoding utf8
 
