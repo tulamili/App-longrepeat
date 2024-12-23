@@ -4,6 +4,8 @@ use 5.034 ; use warnings ; # 最新版に近いPerlで動くようにするの�
 use Time::HiRes qw [ gettimeofday tv_interval ] ;
 my ${ dt_start } = [ gettimeofday ] ; 
 use Encode qw[ decode_utf8 encode_utf8 ] ; 
+use Getopt::Long qw [ GetOptions :config bundling no_ignore_case pass_through ] ;
+GetOptions ( 'fl-l' => \my$fl1 ) ; # $fl1 によって、(F-1)× Lの値が大きい順に優先することを表す。
 use Getopt::Std ; getopts '@:d:g:l:m:wy:' , \my %o  ; 
 use Term::ANSIColor qw[ color :constants ] ; $Term::ANSIColor::AUTORESET = 1 ;
 use FindBin qw[ $Script ] ; 
@@ -29,6 +31,8 @@ binmode STDERR , "utf8" ;
 my $T0 ; # $T0{最初の文字}{2番目の文字}..{''} のようなツリー構造にする。 #$x->{文字1} ->{""} = [親の参照ref (0),その注目文字(1) ,出現頻度(2) ] のような、長さ4の無名配列のデータを作る。
 my @Th ; #  @{ $Th[ 考える文字列の長さ ] } は、 \ $T0{.}{.}..{.}　をリストで格納する。 そのリファレンスから、頻度を参照する
 my %Th_seen ; 
+
+my @LFS ; # [ length, frequency, content(string) ] を保管。
 
 $SIG{ALRM} = sub { say STDERR FAINT BOLD $d3->($.) .  " lines read ; " . sprintf "%02d:%02d:%02d" , ( localtime )[2,1,0]  ; alarm $o{'@'} ; } ; 
 
@@ -74,7 +78,7 @@ sub output {
         $s = $$R->{''}[1] . $s ; # 左に文字追加。
         $R = $$R->{''}[0] ; 
       }
-      say join "\t" , ($L//'.') , $f , "'$s'"  if &y_filter ( $f ) && $o{g} -- ;
+      & oneout ( $L//'.' , $f, "'$s'" ) if &y_filter ( $f ) && $o{g} -- ;
       return if $o{g} == 0 ; 
       #next ;
       #  # 重複除去処理
@@ -91,7 +95,19 @@ sub output {
   } # { 長い順に、各長さごとの処理の終わり }
 }
 
+sub oneout ( $$$ ) {
+  my ( $l, $f, $s) = @_ ;
+  if ( ! $fl1 ) { say join "\t" , $l , $f , $s ; return } 
+  push @LFS , [$l , $f , $s] ;
+}
+
 & output ; 
+
+if ( @LFS ) { 
+  @LFS = sort { $b->[0]*($b->[1]-1) <=> $a->[0]*($a->[1]-1) || $b->[0] <=> $a->[0] || $a->[2] cmp $b->[2] } @LFS ; 
+  say join "\n" , map { join "\t" , $_->[0], $_->[1], $_->[2] } @LFS ; 
+}
+
 exit 0 ;
 
 END {
@@ -101,7 +117,6 @@ END {
   my $s = tv_interval $dt_start , [ gettimeofday ] ; 
   say STDERR BOLD FAINT ITALIC " -- $Script ; " . $procsec . " sec. in process ; " . $readLines . " lines read." ;
 }
-
 
 ##
 sub y_init ( ) { 
@@ -113,8 +128,6 @@ sub y_filter ( $ ) {
   do { return not 0 if $_->[0] <= $_[0] && $_[0] <= $_->[1] } for @y_ranges ; 
   return @y_ranges ? not 1 : not 0 ; # 指定が無かった場合はとにかく真を返す。
 }
-
-
 
 ## ヘルプの扱い
 sub VERSION_MESSAGE {}
@@ -163,6 +176,8 @@ sub HELP_MESSAGE {
   -w    : 文字単位でばらばらにするのではなくて、半角空白文字で分けて処理する。このことで、英文等で単語単位で処理しやすくなる。
   -y  range : 出力する頻度の条件を、2個のピリオド(..)とコンマ(,)で指示する。(3..10,20..30などと表記。) 
   -@  N : 標準入力から読み取った行数を N 秒ごとに 標準エラー出力に 出力する。(未指定なら15)
+
+  --fl-l : (--fのように右側を3文字まで省略してもよい) 文字列の(頻度-1)×(長さ)の値が大きい順に、先に出力する(入力文書の特徴が分かり易い)。
   --help : このオンラインのヘルプ画面を出力する。 perldoc $0 や man $0 でも可能であろう。
 
 開発メモ : 
