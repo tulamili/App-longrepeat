@@ -1,13 +1,15 @@
 #!/usr/bin/perl 
-#use 5.034 ; use warnings ; # 最新版に近いPerlで動くようにするのが望ましい。
-use 5.014 ; use warnings ; # 古いものでも動くようにする。 v5.14 は 2011年5月14日 にリリースされている。
+use 5.034 ; use warnings ; # 最新版に近いPerlで動くようにするのが望ましい。
+#use 5.014 ; use warnings ; # 古いものでも動くようにする。 v5.14 は 2011年5月14日 にリリースされている。
 use Time::HiRes qw [ gettimeofday tv_interval ] ;
 my ${ dt_start } = [ gettimeofday ] ; 
 use Encode qw[ decode_utf8 encode_utf8 ] ; 
-use Getopt::Std ; getopts '@:g:l:m:y:' , \my %o  ; 
+use Getopt::Std ; getopts '@:g:l:m:wy:' , \my %o  ; 
 use Term::ANSIColor qw[ color :constants ] ; $Term::ANSIColor::AUTORESET = 1 ;
 use FindBin qw[ $Script ] ; 
 
+#my $CC ; 
+#END { say STDERR BLUE BOLD "\$CC='$CC'" ; }
 
 $o{g}//=20 ; # 最大何個表示させるか
 $o{m}//=2 ; # 何重以上を出力するか
@@ -20,10 +22,10 @@ our @y_ranges ;
 & y_init () ;
 my $d3 = sub($) { $_[0] =~ s/(?<=\d)(?=(\d\d\d)+($|\D))/,/gr } ;# 3桁区切り　千進法表記
 
-$SIG{INT} = sub { exit } ;
+$SIG{INT} = sub { $SIG{INT} = sub { exit } ; & output  } ;
 binmode STDIN , "utf8" ; 
 binmode STDOUT , "utf8" ;
-
+binmode STDERR , "utf8" ;
 my $T0 ; # $T0{最初の文字}{2番目の文字}..{''} のようなツリー構造にする。 #$x->{文字1} ->{""} = [親の参照ref (0),その注目文字(1) ,出現頻度(2) ] のような、長さ4の無名配列のデータを作る。
 my @Th ; #  @{ $Th[ 考える文字列の長さ ] } は、 \ $T0{.}{.}..{.}　をリストで格納する。 そのリファレンスから、頻度を参照する
 my %Th_seen ; 
@@ -34,18 +36,23 @@ alarm $o{'@'} ;
 
 sub B ($$$) { # 3個の変数は、  ( 親へのリファレンス, 注目文字, 処理中文字列の左から何文字目であるか ) 
   my ($R,$C,$L) = @_ ; 
-  my $Rc = \ $$R -> { "$C" } ; # 子へのリファレンスを 生成している  $$_[0] -> { $_[1]} はエラーが出た謎あり。${$_[0]} -> { $_[1]} で対処出来た。
+  #$CC = $C ;
+  #say STDERR BLUE BOLD "\$CC='$CC'" ;
+  #$C = "000" if $C eq '' ; 
+  my $Rc = \ $$R -> { $C } ; # 子へのリファレンスを 生成している  $$_[0] -> { $_[1]} はエラーが出た謎あり。${$_[0]} -> { $_[1]} で対処出来た。
   $$Rc->{''}[0] = $R ; # 親へのリファレンス  
   $$Rc->{''}[1] = $C ; # 注目文字 
   $$Rc->{''}[2] ++ ;   # 頻度
-  push @{ $Th [ $L ] } , $Rc unless $Th_seen { $Rc } ++ ;
-  #say CYAN $L ;  
+  push @{ $Th [ $L ] } , $Rc unless $Th_seen { $Rc } ++ ;  
   return ( $Rc ) ; # 生成した子(与えられた文字に対応している)のリファレンスを返す。
 }
 
+my $sep = $o{w} ? qr/(\ +)/ : qr// ; # どういう単位で区切るか? 半角空白か文字単位でばらばらにするのか? 
+
 while ( <> ) { # { 各行について }
-  chomp ;
-  my @C = split // , $_ , 0 ; # 各文字 にバラバラにする。
+  chomp ; 
+  s/\r$// ; # Windows形式の改行に対応。
+  my @C = split /$sep/o , $_ , 0 ; # 各文字 にバラバラにする。
   while ( defined ( $_ = shift @C ) )  { # { 各行の 文字列を左から一文字ずつ削り出して 処理 }
     my $L = 0 ; # 格納した文字が左から何番目であるか。 (逆方向に辿るときには、(最終的に?)文字列の長さ にするので 前置++とした) Length 
     my $R = \$T0 ; # & B ( \$T0 , $_ , ++ $L ) ; # refrence ;
@@ -55,35 +62,38 @@ while ( <> ) { # { 各行について }
   $readLines ++ ; 
 }
 
-say UNDERLINE join "\t", qw[ len frq content ] ; 
-for my $L ( reverse $o{l} .. $#Th ) {
-  my @Rs = sort { $$b->{''}[2] <=> $$a->{''}[2] } grep { $$_->{''}[2] >= $o{m} } @{ $Th[$L] } ; 
-  for my $R ( @Rs ) {
-    my $f ; # Frequency 頻度 
-    my $s = '' ; # string 文字列 
-    $f = $$R->{''}[2] ;  
-    while ( $R ) {
-      $s = ( $$R->{''}[1] // '' ) . $s ;
-      $R = $$R->{''}[0] ; 
-    }
-    say join "\t" , ($L//'.') , $f , "'$s'" if &y_filter ( $f ) && $o{g} -- ;
-    goto END unless $o{g} ; 
-    #  # 重複除去処理
-    my @C = split // , $s , 0 ; # 各文字 にバラバラにする。
-    while ( $_ = shift @C ) { # { 各行の 文字列を左から一文字ずつ削り出して 処理 }
-      my $R = \$T0 ; 
-      for ( $_ , @C ) { 
-        my $Rc = \ $$R -> { $_ } ; 
-        $$Rc->{''}[2] = 0 if $$Rc->{''}[2] == $f ; 
-        $R = $Rc ; 
+sub output {  
+  say UNDERLINE join "\t", qw[ len frq content ] ; 
+  for my $L ( reverse $o{l} .. $#Th ) {
+    my @Rs = sort { $$b->{''}[2] <=> $$a->{''}[2] } grep { $$_->{''}[2] >= $o{m} } @{ $Th[$L] } ; 
+    for my $R ( @Rs ) {
+      my $f ; # Frequency 頻度 
+      my $s = '' ; # string 文字列 
+      $f = $$R->{''}[2] ;  
+      while ( $R != \$T0 ) {
+        #$$R->{''}[2] = 0 if $$R->{''}[2] == $f ;
+        $s = $$R->{''}[1] . $s ; # 左に文字追加。
+        $R = $$R->{''}[0] ; 
       }
-    }
-  }
+      say join "\t" , ($L//'.') , $f , "'$s'"  if &y_filter ( $f ) && $o{g} -- ;
+      return if $o{g} == 0 ; 
+      #next ;
+      #  # 重複除去処理
+      my @C = split /$sep/o , $s , 0 ; # 各文字 にバラバラにする。
+      while ( defined ( $_ = shift @C ) ) { # { 各行の 文字列を左から一文字ずつ削り出して 処理 }
+        my $R = \$T0 ; 
+        for ( $_ , @C ) { 
+          my $Rc = \ $$R -> { $_ } ; 
+          $$Rc->{''}[2] = 0 if ($$Rc->{''}[2]//0) == $f ; # <-- - //0 の必要性を消したい。
+          $R = $Rc ; 
+        }
+      } # {重複除去処理の終わり}
+    } # { ある長さを持つ、ひとつひとつのリファレンスに対する処理}
+  } # { 長い順に、各長さごとの処理の終わり }
 }
 
-END: 
+& output ; 
 exit 0 ;
-
 
 END {
   exit if $help ;
@@ -148,6 +158,8 @@ sub HELP_MESSAGE {
   -g  N : 何個まで取り出すか。(未指定なら20)
   -m  N : 何回以上の頻度(出現回数)の場合に出力するか。(未指定なら2)
   -l  N : 何文字以上の場合に出力するか。(未指定なら2)  
+
+  -w    : 文字単位でばらばらにするのではなくて、半角空白文字で分けて処理する。このことで、英文等で単語単位で処理しやすくなる。
   -y  range : 出力する頻度の条件を、2個のピリオド(..)とコンマ(,)で指示する。(3..10,20..30などと表記。) 
   -@  N : 標準入力から読み取った行数を N 秒ごとに 標準エラー出力に 出力する。(未指定なら15)
   --help : このオンラインのヘルプ画面を出力する。 perldoc $0 や man $0 でも可能であろう。
