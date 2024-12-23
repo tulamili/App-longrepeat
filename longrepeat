@@ -43,10 +43,8 @@ sub B ($$$) { # 3個の変数は、  ( 親へのリファレンス, 注目文字
   push @{ $Th [ $L ] } , $Rc unless $Th_seen { $Rc } ++ ;  
   return ( $Rc ) ; # 生成した子(与えられた文字に対応している)のリファレンスを返す。
 }
-
-#use utf8 ; 
+ 
 my $rest ; 
-#say RED $o{d} ;
 while ( <> ) { # { 各行について }
   chomp ; 
   s/\r$// ; # Windows形式の改行に対応。
@@ -56,9 +54,8 @@ while ( <> ) { # { 各行について }
   while ( defined ( $_ = shift @C ) )  { # { 各行の 文字列を左から一文字ずつ削り出して 処理 }
     my $L = 0 ; # 格納した文字が左から何番目であるか。 (逆方向に辿るときには、(最終的に?)文字列の長さ にするので 前置++とした) Length 
     my $R = \$T0 ; # & B ( \$T0 , $_ , ++ $L ) ; # refrence ;
-    for ($_ , @C) { $R = & B ( $R , $_ , ++ $L ) } ; # <- 糖衣構文  for 文
+    for ($_ , @C) { $R = & B ( $R , $_ , ++ $L ) } ;
   }
-  #say YELLOW $_ ; 
   if (defined $rest) { $_ = $rest ; $rest = undef ; redo } ; 
 } continue {
   $readLines ++ ; 
@@ -175,6 +172,7 @@ sub HELP_MESSAGE {
      したがって、日本語であれば、句読点ごとに改行文字を入れる前処理をしてから この longrepeatを実施すると、
      メモリー消費も少なくなって、フリーズもしにくくなり、実行時間も短くできる。
   * 出力順序に関して。len(文字列長)とfrq(頻度)の積が多い順(ただしmin{frq,len}>=2)となるような出力オプションを実装したい。
+  * Ctrl-C ですぐ停止不能なので、Ctrl+Zをつかってプロセスを killするしかないことも多いかもしれない。
 
 =cut
 
