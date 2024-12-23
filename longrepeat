@@ -4,12 +4,9 @@ use 5.034 ; use warnings ; # 最新版に近いPerlで動くようにするの�
 use Time::HiRes qw [ gettimeofday tv_interval ] ;
 my ${ dt_start } = [ gettimeofday ] ; 
 use Encode qw[ decode_utf8 encode_utf8 ] ; 
-use Getopt::Std ; getopts '@:g:l:m:wy:' , \my %o  ; 
+use Getopt::Std ; getopts '@:d:g:l:m:wy:' , \my %o  ; 
 use Term::ANSIColor qw[ color :constants ] ; $Term::ANSIColor::AUTORESET = 1 ;
 use FindBin qw[ $Script ] ; 
-
-#my $CC ; 
-#END { say STDERR BLUE BOLD "\$CC='$CC'" ; }
 
 $o{g}//=20 ; # 最大何個表示させるか
 $o{m}//=2 ; # 何重以上を出力するか
@@ -17,6 +14,9 @@ $o{l}//=2 ; # 何文字以上　の反復を出力するか
 my $help = 0  ; # オンラインヘルプの文面の表示をしたか否か。
 my $readLines  ; # 読み取った行数
 $o{'@'} //= 15 ; # 何秒おきにアラームを発生させるか
+my $sep = $o{w} ? qr/(\ +)/ : qr// ; # どういう単位で区切るか? 半角空白か文字単位でばらばらにするのか? 
+
+$o{d} = decode_utf8 ( $o{d} ) if exists $o{d} ;
 
 our @y_ranges ; 
 & y_init () ;
@@ -36,9 +36,6 @@ alarm $o{'@'} ;
 
 sub B ($$$) { # 3個の変数は、  ( 親へのリファレンス, 注目文字, 処理中文字列の左から何文字目であるか ) 
   my ($R,$C,$L) = @_ ; 
-  #$CC = $C ;
-  #say STDERR BLUE BOLD "\$CC='$CC'" ;
-  #$C = "000" if $C eq '' ; 
   my $Rc = \ $$R -> { $C } ; # 子へのリファレンスを 生成している  $$_[0] -> { $_[1]} はエラーが出た謎あり。${$_[0]} -> { $_[1]} で対処出来た。
   $$Rc->{''}[0] = $R ; # 親へのリファレンス  
   $$Rc->{''}[1] = $C ; # 注目文字 
@@ -47,17 +44,22 @@ sub B ($$$) { # 3個の変数は、  ( 親へのリファレンス, 注目文字
   return ( $Rc ) ; # 生成した子(与えられた文字に対応している)のリファレンスを返す。
 }
 
-my $sep = $o{w} ? qr/(\ +)/ : qr// ; # どういう単位で区切るか? 半角空白か文字単位でばらばらにするのか? 
-
+#use utf8 ; 
+my $rest ; 
+#say RED $o{d} ;
 while ( <> ) { # { 各行について }
   chomp ; 
   s/\r$// ; # Windows形式の改行に対応。
+
+  if (exists $o{d} && m/(.*?[$o{d}])(.*)/ ) { $_ = $1 ; $rest = $2 }
   my @C = split /$sep/o , $_ , 0 ; # 各文字 にバラバラにする。
   while ( defined ( $_ = shift @C ) )  { # { 各行の 文字列を左から一文字ずつ削り出して 処理 }
     my $L = 0 ; # 格納した文字が左から何番目であるか。 (逆方向に辿るときには、(最終的に?)文字列の長さ にするので 前置++とした) Length 
     my $R = \$T0 ; # & B ( \$T0 , $_ , ++ $L ) ; # refrence ;
     for ($_ , @C) { $R = & B ( $R , $_ , ++ $L ) } ; # <- 糖衣構文  for 文
   }
+  #say YELLOW $_ ; 
+  if (defined $rest) { $_ = $rest ; $rest = undef ; redo } ; 
 } continue {
   $readLines ++ ; 
 }
@@ -154,6 +156,8 @@ sub HELP_MESSAGE {
   文書の分かり易い特徴付けができると言える。(汎用性と分かり易さ、再現性が確保できる特徴付けである。)
 
 オプション : 
+
+  -d STR : 改行文字に加えて、STRの各文字(例 。、)を区切りに追加する(日本語を短く切る効果)。行数の表示を変えない便利さあり。  
 
   -g  N : 何個まで取り出すか。(未指定なら20)
   -m  N : 何回以上の頻度(出現回数)の場合に出力するか。(未指定なら2)
